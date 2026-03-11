@@ -76,13 +76,40 @@ RUN git clone \
         /appflowy_cloud_src
 
 
-# ── Stages 4-6: Pull official AppFlowy arm64 binaries ────────────────────────
-# No Rust compilation needed – AppFlowy Inc publishes multi-arch images.
-# The -arm64v8 suffix ensures we get the correct variant on any build host.
+# ── Stage 4: Build AppFlowy Cloud Rust binaries on Debian Bookworm ───────────
+# Official appflowyinc images require GLIBC_2.39 (Ubuntu 24.04 build env),
+# but Debian Bookworm only has GLIBC_2.36. Compiling here produces binaries
+# that link against Bookworm's glibc and run correctly in the final stage.
+# This takes 30-45 min on Pi 5 but is cached by Docker on subsequent builds.
+FROM rust:bookworm AS build-appflowy
 
-FROM appflowyinc/appflowy_cloud:0.13.2 AS source-appflowy
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        protobuf-compiler \
+        pkg-config \
+        libssl-dev \
+        git \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+RUN git clone \
+        https://github.com/AppFlowy-IO/AppFlowy-Cloud.git \
+        --depth 1 \
+        --branch main \
+        .
+
+# SQLX_OFFLINE skips live-DB query validation at compile time
+ENV SQLX_OFFLINE=true
+
+# Build only the two binaries we need (admin_frontend is Node.js, not Rust)
+RUN cargo build --release \
+        --bin appflowy_cloud \
+        --bin appflowy_worker
+
+# ── Stage 5: Pull admin_frontend (Node.js app, no glibc issue) ───────────────
 FROM appflowyinc/admin_frontend:0.13.2 AS source-admin
-FROM appflowyinc/appflowy_worker:0.13.2 AS source-worker
 
 
 # ── Final stage: assemble into the HA aarch64 Debian base image ──────────────
@@ -104,6 +131,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
         ca-certificates \
         gosu \
+        libssl3 \
     && rm -rf /var/lib/apt/lists/*
 
 # MinIO (no Debian package – download the arm64 static binary)
@@ -137,8 +165,8 @@ RUN chmod +x /auth/auth /auth/start.sh
 # ── AppFlowy Cloud service binaries ───────────────────────────────────────────
 RUN mkdir -p /appflowy_cloud
 
-COPY --from=source-appflowy /usr/local/bin/appflowy_cloud /appflowy_cloud/appflowy_cloud
-COPY --from=source-worker   /usr/local/bin/appflowy_worker /appflowy_cloud/appflowy_worker
+COPY --from=build-appflowy /app/target/release/appflowy_cloud /appflowy_cloud/appflowy_cloud
+COPY --from=build-appflowy /app/target/release/appflowy_worker /appflowy_cloud/appflowy_worker
 
 RUN chmod +x \
     /appflowy_cloud/appflowy_cloud \
