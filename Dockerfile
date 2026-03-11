@@ -86,6 +86,7 @@ FROM rust:bookworm AS build-appflowy
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         protobuf-compiler \
+        libprotobuf-dev \
         pkg-config \
         libssl-dev \
         git \
