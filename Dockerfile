@@ -5,7 +5,7 @@
 #
 # Multi-stage build:
 #   1. build-gotrue   – compile GoTrue auth binary (static, Go)
-#   2. build-pgvector – compile pgvector against Debian postgresql16-dev
+#   2. build-pgvector – compile pgvector against Debian postgresql15-dev
 #   3. build-source   – clone AppFlowy-Cloud for start.sh and assets
 #   4-6. source-*     – pull official AppFlowy arm64 binaries (no Rust compile!)
 #   7. Final stage    – assemble everything into the HA Debian base image
@@ -46,7 +46,7 @@ ARG PGVECTOR_VERSION
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
-        postgresql-server-dev-16 \
+        postgresql-server-dev-15 \
         git \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
@@ -82,9 +82,9 @@ RUN git clone \
 # No Rust compilation needed – AppFlowy Inc publishes multi-arch images.
 # The -arm64v8 suffix ensures we get the correct variant on any build host.
 
-FROM --platform=linux/arm64 appflowyinc/appflowy_cloud:0.13.2 AS source-appflowy
-FROM --platform=linux/arm64 appflowyinc/admin_frontend:0.13.2 AS source-admin
-FROM --platform=linux/arm64 appflowyinc/appflowy_worker:0.13.2 AS source-worker
+FROM appflowyinc/appflowy_cloud:0.13.2 AS source-appflowy
+FROM appflowyinc/admin_frontend:0.13.2 AS source-admin
+FROM appflowyinc/appflowy_worker:0.13.2 AS source-worker
 
 
 # ── Final stage: assemble into the HA aarch64 Debian base image ──────────────
@@ -99,8 +99,8 @@ LABEL \
 # ── Runtime packages ──────────────────────────────────────────────────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \
         redis-server \
-        postgresql-16 \
-        postgresql-16-contrib \
+        postgresql-15 \
+        postgresql-client-15 \
         nginx \
         curl \
         ca-certificates \
@@ -115,12 +115,12 @@ RUN curl -fsSL \
 
 # ── pgvector: shared object + extension SQL files ─────────────────────────────
 COPY --from=build-pgvector \
-    /usr/lib/postgresql/16/lib/vector.so \
-    /usr/lib/postgresql/16/lib/vector.so
+    /usr/lib/postgresql/15/lib/vector.so \
+    /usr/lib/postgresql/15/lib/vector.so
 
 COPY --from=build-pgvector \
-    /usr/share/postgresql/16/extension/ \
-    /usr/share/postgresql/16/extension/
+    /usr/share/postgresql/15/extension/ \
+    /usr/share/postgresql/15/extension/
 
 # ── GoTrue (auth service) ─────────────────────────────────────────────────────
 RUN mkdir -p /auth

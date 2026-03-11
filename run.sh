@@ -27,9 +27,9 @@ readonly LOG_DIR=/data/logs
 readonly PG_DATA=/data/postgresql
 readonly MINIO_DATA=/data/minio
 
-# Debian postgresql-16 binary paths
-readonly PG_CTL=/usr/lib/postgresql/16/bin/pg_ctl
-readonly INITDB=/usr/lib/postgresql/16/bin/initdb
+# Debian postgresql-15 binary paths
+readonly PG_CTL=/usr/lib/postgresql/15/bin/pg_ctl
+readonly INITDB=/usr/lib/postgresql/15/bin/initdb
 readonly PSQL=/usr/bin/psql
 
 # ── Helper: wait for a TCP port to become available ──────────────────────────
