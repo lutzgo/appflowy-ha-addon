@@ -1,0 +1,94 @@
+---
+name: AppFlowy Cloud
+description: >-
+  Self-hosted AppFlowy Cloud – collaborative workspace server with
+  PostgreSQL, Redis, MinIO, GoTrue auth, and Nginx reverse proxy.
+  All services run in a single container.
+version: "0.9.52"
+slug: appflowy_cloud
+url: "https://github.com/appflowy-ha-addon"
+init: false
+arch:
+  - aarch64
+
+# ── Port mapping ─────────────────────────────────────────────────────────────
+ports:
+  8087/tcp: 8087
+ports_description:
+  8087/tcp: "AppFlowy Cloud web interface (Nginx reverse proxy)"
+
+# ── Web UI shortcut in HA sidebar ─────────────────────────────────────────────
+webui: "http://[HOST]:[PORT:8087]"
+
+# ── Persistent data ────────────────────────────────────────────────────────────
+map:
+  - data:rw
+
+# ── User-configurable options ──────────────────────────────────────────────────
+options:
+  SECRET: "change_me_use_a_long_random_string"
+  ADMIN_EMAIL: "admin@example.com"
+  ADMIN_PASSWORD: "password"
+  PUBLIC_URL: "http://homeassistant.local:8087"
+  SMTP_HOST: "smtp.example.com"
+  SMTP_PORT: 465
+  SMTP_USER: "user@example.com"
+  SMTP_PASSWORD: "password"
+
+schema:
+  SECRET: "password"
+  ADMIN_EMAIL: "email"
+  ADMIN_PASSWORD: "password"
+  PUBLIC_URL: "url"
+  SMTP_HOST: "str"
+  SMTP_PORT: "int"
+  SMTP_USER: "email"
+  SMTP_PASSWORD: "password"
+
+# ── Static environment (service wiring) ───────────────────────────────────────
+# Dynamic values (JWT secret, SMTP, public URL) are set in run.sh from options.
+environment:
+  # GoTrue / auth
+  GOTRUE_DB_DRIVER: "postgres"
+  GOTRUE_MAILER_URLPATHS_CONFIRMATION: "/gotrue/verify"
+  GOTRUE_MAILER_URLPATHS_INVITE: "/gotrue/verify"
+  GOTRUE_MAILER_URLPATHS_RECOVERY: "/gotrue/verify"
+  GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: "/gotrue/verify"
+  DATABASE_URL: "postgres://supabase_auth_admin:root@localhost:5432/postgres"
+  PORT: "9999"
+
+  # AppFlowy Cloud
+  RUST_LOG: "info"
+  APPFLOWY_ENVIRONMENT: "production"
+  APPFLOWY_DATABASE_URL: "postgres://postgres:password@localhost:5432/postgres"
+  APPFLOWY_REDIS_URI: "redis://localhost:6379"
+  APPFLOWY_GOTRUE_JWT_EXP: "7200"
+  APPFLOWY_GOTRUE_BASE_URL: "http://localhost:9999"
+  APPFLOWY_ACCESS_CONTROL: "true"
+
+  # S3 / MinIO
+  APPFLOWY_S3_USE_MINIO: "true"
+  APPFLOWY_S3_CREATE_BUCKET: "true"
+  APPFLOWY_S3_MINIO_URL: "http://localhost:9000"
+  APPFLOWY_S3_ACCESS_KEY: "minioadmin"
+  APPFLOWY_S3_SECRET_KEY: "minioadmin"
+  APPFLOWY_S3_BUCKET: "appflowy"
+
+  # Admin Frontend
+  ADMIN_FRONTEND_REDIS_URL: "redis://localhost:6379"
+  ADMIN_FRONTEND_GOTRUE_URL: "http://localhost:9999"
+  ADMIN_FRONTEND_APPFLOWY_CLOUD_URL: "http://localhost:8000"
+  ADMIN_FRONTEND_PATH_PREFIX: "/console"
+
+  # Indexer
+  APPFLOWY_INDEXER_ENABLED: "true"
+  APPFLOWY_INDEXER_DATABASE_URL: "postgres://postgres:password@localhost:5432/postgres"
+  APPFLOWY_INDEXER_REDIS_URL: "redis://localhost:6379"
+  APPFLOWY_COLLABORATE_MULTI_THREAD: "false"
+  APPFLOWY_COLLABORATE_REMOVE_BATCH_SIZE: "100"
+
+  # Worker
+  APPFLOWY_WORKER_REDIS_URL: "redis://localhost:6379"
+  APPFLOWY_WORKER_ENVIRONMENT: "production"
+  APPFLOWY_WORKER_DATABASE_URL: "postgres://postgres:password@localhost:5432/postgres"
+  APPFLOWY_WORKER_DATABASE_NAME: "postgres"
