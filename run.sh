@@ -1,4 +1,4 @@
-#!/usr/bin/env bashio
+#!/usr/bin/with-contenv bashio
 # =============================================================================
 # AppFlowy Cloud – Home Assistant Add-on startup script
 #
@@ -26,6 +26,11 @@ set -e
 readonly LOG_DIR=/data/logs
 readonly PG_DATA=/data/postgresql
 readonly MINIO_DATA=/data/minio
+
+# Debian postgresql-16 binary paths
+readonly PG_CTL=/usr/lib/postgresql/16/bin/pg_ctl
+readonly INITDB=/usr/lib/postgresql/16/bin/initdb
+readonly PSQL=/usr/bin/psql
 
 # ── Helper: wait for a TCP port to become available ──────────────────────────
 wait_for_port() {
@@ -73,7 +78,8 @@ export GOTRUE_SMTP_PORT="${SMTP_PORT}"
 export GOTRUE_SMTP_USER="${SMTP_USER}"
 export GOTRUE_SMTP_PASS="${SMTP_PASSWORD}"
 export GOTRUE_SMTP_ADMIN_EMAIL="${SMTP_USER}"
-export GOTRUE_MAILER_AUTOCONFIRM="false"
+# Auto-confirm emails so users can sign in without SMTP configured
+export GOTRUE_MAILER_AUTOCONFIRM="true"
 export GOTRUE_SITE_URL="${PUBLIC_URL}"
 export API_EXTERNAL_URL="${PUBLIC_URL}/gotrue"
 
@@ -94,12 +100,17 @@ export MINIO_ROOT_PASSWORD="minioadmin"
 bashio::log.info "Setting up log directory at ${LOG_DIR} …"
 mkdir -p "${LOG_DIR}"
 
-# ── 4. PostgreSQL: initialise data directory (once) ──────────────────────────
+# ── 4. Ensure PostgreSQL unix socket directory exists ─────────────────────────
+# /var/run is often a tmpfs in containers; recreate it each boot.
+mkdir -p /var/run/postgresql
+chown postgres:postgres /var/run/postgresql
+
+# ── 5. PostgreSQL: initialise data directory (once) ──────────────────────────
 if [ ! -d "${PG_DATA}" ]; then
     bashio::log.info "Initialising PostgreSQL data directory …"
     mkdir -p "${PG_DATA}"
     chown postgres:postgres "${PG_DATA}"
-    su-exec postgres initdb \
+    gosu postgres "${INITDB}" \
         -D "${PG_DATA}" \
         --auth-local=trust \
         --auth-host=md5 \
@@ -108,48 +119,37 @@ if [ ! -d "${PG_DATA}" ]; then
 fi
 
 bashio::log.info "Starting PostgreSQL …"
-su-exec postgres pg_ctl \
+gosu postgres "${PG_CTL}" \
     start \
     -D "${PG_DATA}" \
     -l "${LOG_DIR}/postgres.log" \
-    -w   # wait until server is ready before returning
+    -w
 bashio::log.info "PostgreSQL started"
 
-# ── 5. PostgreSQL: configure roles and passwords (idempotent) ─────────────────
+# ── 6. PostgreSQL: configure roles and passwords (idempotent) ─────────────────
 
-# Set the 'postgres' superuser password so AppFlowy Cloud can authenticate.
-# This is idempotent: running ALTER USER again with the same password is fine.
 bashio::log.info "Setting postgres superuser password …"
-su-exec postgres psql -c \
+gosu postgres "${PSQL}" -c \
     "ALTER USER postgres WITH PASSWORD 'password';" \
     >> "${LOG_DIR}/postgres.log" 2>&1
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CRITICAL FIX: Create the 'supabase_auth_admin' role BEFORE GoTrue starts.
-#
-# GoTrue's DATABASE_URL is configured as:
-#   postgres://supabase_auth_admin:root@localhost:5432/postgres
-#
-# GoTrue connects as this role to run schema migrations and serve auth
-# requests.  Without this role, GoTrue crashes silently at startup with no
-# useful error message in the log.
-#
-# The role needs SUPERUSER + LOGIN so it can create the 'auth' schema and
-# manage objects within it.
+# GoTrue's DATABASE_URL connects as this role; without it GoTrue crashes silently.
 # ─────────────────────────────────────────────────────────────────────────────
-if su-exec postgres psql -tAc \
+if gosu postgres "${PSQL}" -tAc \
     "SELECT 1 FROM pg_roles WHERE rolname='supabase_auth_admin';" \
     2>/dev/null | grep -q 1; then
     bashio::log.info "PostgreSQL role 'supabase_auth_admin' already exists – skipping"
 else
     bashio::log.info "Creating PostgreSQL role 'supabase_auth_admin' …"
-    su-exec postgres psql -c \
+    gosu postgres "${PSQL}" -c \
         "CREATE ROLE supabase_auth_admin WITH SUPERUSER LOGIN PASSWORD 'root';" \
         >> "${LOG_DIR}/postgres.log" 2>&1
     bashio::log.info "Role 'supabase_auth_admin' created"
 fi
 
-# ── 6. Redis ──────────────────────────────────────────────────────────────────
+# ── 7. Redis ──────────────────────────────────────────────────────────────────
 bashio::log.info "Starting Redis …"
 redis-server \
     --daemonize no \
@@ -158,7 +158,7 @@ redis-server \
 
 wait_for_port "localhost" "6379" 15 "redis"
 
-# ── 7. MinIO ──────────────────────────────────────────────────────────────────
+# ── 8. MinIO ──────────────────────────────────────────────────────────────────
 bashio::log.info "Starting MinIO …"
 mkdir -p "${MINIO_DATA}"
 
@@ -168,31 +168,31 @@ minio server "${MINIO_DATA}" \
 
 wait_for_port "localhost" "9000" 30 "minio"
 
-# ── 8. GoTrue (auth service) ──────────────────────────────────────────────────
-# start.sh (from AppFlowy-Cloud) runs: auth migrate → create admin user → auth
-# It must run AFTER supabase_auth_admin role exists (step 5 above).
+# ── 9. GoTrue (auth service) ──────────────────────────────────────────────────
+# start.sh runs: auth migrate → create admin user → auth binary
+# MUST run AFTER supabase_auth_admin role exists (step 6 above).
 bashio::log.info "Starting GoTrue auth service …"
 cd /auth
 ./start.sh >> "${LOG_DIR}/auth.log" 2>&1 &
 
 wait_for_port "localhost" "9999" 60 "auth"
 
-# ── 9. AppFlowy Cloud (main API) ──────────────────────────────────────────────
+# ── 10. AppFlowy Cloud (main API) ──────────────────────────────────────────────
 bashio::log.info "Starting AppFlowy Cloud …"
 cd /appflowy_cloud
 ./appflowy_cloud >> "${LOG_DIR}/appflowy_cloud.log" 2>&1 &
 
 wait_for_port "localhost" "8000" 60 "appflowy_cloud"
 
-# ── 10. Admin Frontend ────────────────────────────────────────────────────────
-# Override PORT=9999 (set for GoTrue) – admin_frontend listens on 3000.
+# ── 11. Admin Frontend ────────────────────────────────────────────────────────
+# Override PORT=9999 (set for GoTrue in config.yml) – admin_frontend uses 3000.
 bashio::log.info "Starting Admin Frontend …"
 PORT=3000 ./admin_frontend >> "${LOG_DIR}/admin_frontend.log" 2>&1 &
 
-# ── 11. AppFlowy Worker ───────────────────────────────────────────────────────
+# ── 12. AppFlowy Worker ───────────────────────────────────────────────────────
 bashio::log.info "Starting AppFlowy Worker …"
 ./appflowy_worker >> "${LOG_DIR}/appflowy_worker.log" 2>&1 &
 
-# ── 12. Nginx (foreground – keeps the container alive) ────────────────────────
+# ── 13. Nginx (foreground – keeps the container alive) ────────────────────────
 bashio::log.info "All services started. Starting Nginx on port 8087 …"
 nginx -g "daemon off;"

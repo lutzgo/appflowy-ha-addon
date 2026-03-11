@@ -1,14 +1,15 @@
 ---
 # Build configuration for the AppFlowy Cloud Home Assistant add-on.
 # Target: aarch64 (Raspberry Pi 5) only.
-# The image is built locally from this Dockerfile – no pre-built image is used.
+# Uses ghcr.io/home-assistant/aarch64-base-debian (glibc/bookworm) so that
+# official AppFlowy arm64 binaries (built against glibc) run correctly.
 
 build_from:
-  aarch64: ghcr.io/home-assistant/aarch64-base:3.20
+  aarch64: ghcr.io/home-assistant/aarch64-base-debian:bookworm
 
 args:
-  # AppFlowy-Cloud branch/tag to build from
-  APPFLOWY_CLOUD_VERSION: "main"
+  # AppFlowy-Cloud version to pull binaries and source from
+  APPFLOWY_VERSION: "0.13.2"
   # GoTrue branch to build from (AppFlowy fork)
   GOTRUE_VERSION: "0.8.0"
   # pgvector tag
