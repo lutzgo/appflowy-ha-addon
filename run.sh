@@ -174,7 +174,8 @@ wait_for_port "localhost" "9000" 30 "minio"
 # MUST run AFTER supabase_auth_admin role exists (step 6 above).
 bashio::log.info "Starting GoTrue auth service …"
 cd /auth
-./start.sh >> "${LOG_DIR}/auth.log" 2>&1 &
+# No file redirect: output goes to HA supervisor log so we can see failures
+./start.sh &
 
 wait_for_port "localhost" "9999" 60 "auth"
 
