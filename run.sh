@@ -169,7 +169,20 @@ minio server "${MINIO_DATA}" \
 
 wait_for_port "localhost" "9000" 30 "minio"
 
-# ── 9. GoTrue (auth service) ──────────────────────────────────────────────────
+# ── 9. Pre-create auth schema prerequisites ───────────────────────────────────
+# GoTrue's add_mfa_schema migration creates factor_type without a schema prefix,
+# while add_mfa_phone_config expects auth.factor_type. Pre-creating it here
+# ensures migrations can find it regardless of search_path at migration time.
+bashio::log.info "Pre-creating auth schema prerequisites …"
+gosu postgres "${PSQL}" -c "CREATE SCHEMA IF NOT EXISTS auth AUTHORIZATION supabase_auth_admin;"
+gosu postgres "${PSQL}" <<'SQL'
+DO $$ BEGIN
+    CREATE TYPE auth.factor_type AS ENUM ('totp', 'webauthn');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+SQL
+
+# ── 10. GoTrue (auth service) ─────────────────────────────────────────────────
 # start.sh runs: auth migrate → create admin user → auth binary
 # MUST run AFTER supabase_auth_admin role exists (step 6 above).
 bashio::log.info "Starting GoTrue auth service …"
@@ -179,14 +192,14 @@ cd /auth
 
 wait_for_port "localhost" "9999" 60 "auth"
 
-# ── 10. AppFlowy Cloud (main API) ──────────────────────────────────────────────
+# ── 11. AppFlowy Cloud (main API) ──────────────────────────────────────────────
 bashio::log.info "Starting AppFlowy Cloud …"
 cd /appflowy_cloud
 ./appflowy_cloud >> "${LOG_DIR}/appflowy_cloud.log" 2>&1 &
 
 wait_for_port "localhost" "8000" 60 "appflowy_cloud"
 
-# ── 11. Admin Frontend ────────────────────────────────────────────────────────
+# ── 12. Admin Frontend ────────────────────────────────────────────────────────
 # Node.js app: node apps/super/server.js from /admin_frontend
 # PORT env var controls which port it listens on (default 3000).
 bashio::log.info "Starting Admin Frontend …"
@@ -194,10 +207,10 @@ cd /admin_frontend
 PORT=3000 node apps/super/server.js >> "${LOG_DIR}/admin_frontend.log" 2>&1 &
 cd /appflowy_cloud
 
-# ── 12. AppFlowy Worker ───────────────────────────────────────────────────────
+# ── 13. AppFlowy Worker ───────────────────────────────────────────────────────
 bashio::log.info "Starting AppFlowy Worker …"
 ./appflowy_worker >> "${LOG_DIR}/appflowy_worker.log" 2>&1 &
 
-# ── 13. Nginx (foreground – keeps the container alive) ────────────────────────
+# ── 14. Nginx (foreground – keeps the container alive) ────────────────────────
 bashio::log.info "All services started. Starting Nginx on port 8087 …"
 nginx -g "daemon off;"
