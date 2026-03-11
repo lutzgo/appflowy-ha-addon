@@ -222,8 +222,8 @@ PORT=3000 node apps/super/server.js >> "${LOG_DIR}/admin_frontend.log" 2>&1 &
 cd /appflowy_cloud
 
 # ── 13. AppFlowy Worker ───────────────────────────────────────────────────────
-bashio::log.info "Starting AppFlowy Worker …"
-./appflowy_worker >> "${LOG_DIR}/appflowy_worker.log" 2>&1 &
+# appflowy_worker is not a separate binary in AppFlowy-Cloud main branch; skipping.
+bashio::log.info "AppFlowy Worker: not a separate binary in this build, skipping."
 
 # ── 14. Nginx (foreground – keeps the container alive) ────────────────────────
 bashio::log.info "All services started. Starting Nginx on port 8087 …"

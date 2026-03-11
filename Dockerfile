@@ -105,8 +105,7 @@ ENV SQLX_OFFLINE=true
 
 # Build only the two binaries we need (admin_frontend is Node.js, not Rust)
 RUN cargo build --release \
-        --bin appflowy_cloud \
-        --bin appflowy_worker
+        --bin appflowy_cloud
 
 # ── Stage 5: Pull admin_frontend (Node.js app, no glibc issue) ───────────────
 FROM appflowyinc/admin_frontend:0.13.2 AS source-admin
@@ -166,11 +165,8 @@ RUN chmod +x /auth/auth /auth/start.sh
 RUN mkdir -p /appflowy_cloud
 
 COPY --from=build-appflowy /app/target/release/appflowy_cloud /appflowy_cloud/appflowy_cloud
-COPY --from=build-appflowy /app/target/release/appflowy_worker /appflowy_cloud/appflowy_worker
 
-RUN chmod +x \
-    /appflowy_cloud/appflowy_cloud \
-    /appflowy_cloud/appflowy_worker
+RUN chmod +x /appflowy_cloud/appflowy_cloud
 
 # Admin frontend – Node.js app (not a Rust binary)
 # Image runs: node apps/super/server.js from WORKDIR /app
