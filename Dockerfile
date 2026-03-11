@@ -62,10 +62,8 @@ WORKDIR /pgvector
 RUN make && make install
 
 
-# ── Stage 3: Clone AppFlowy-Cloud for start.sh and admin_frontend assets ─────
+# ── Stage 3: Clone AppFlowy-Cloud for gotrue/start.sh ────────────────────────
 FROM debian:bookworm-slim AS build-source
-
-ARG APPFLOWY_VERSION
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         git ca-certificates \
@@ -74,7 +72,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN git clone \
         https://github.com/AppFlowy-IO/AppFlowy-Cloud.git \
         --depth 1 \
-        --branch "${APPFLOWY_VERSION}" \
+        --branch "main" \
         /appflowy_cloud_src
 
 
