@@ -115,7 +115,7 @@ if [ ! -d "${PG_DATA}" ]; then
         -D "${PG_DATA}" \
         --auth-local=trust \
         --auth-host=md5 \
-        >> "${LOG_DIR}/postgres.log" 2>&1
+        >> "${LOG_DIR}/initdb.log" 2>&1
     bashio::log.info "PostgreSQL data directory initialised"
 fi
 
