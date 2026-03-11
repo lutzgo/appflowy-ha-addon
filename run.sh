@@ -209,7 +209,7 @@ wait_for_port "localhost" "9999" 60 "auth"
 # ── 11. AppFlowy Cloud (main API) ──────────────────────────────────────────────
 bashio::log.info "Starting AppFlowy Cloud …"
 cd /appflowy_cloud
-./appflowy_cloud >> "${LOG_DIR}/appflowy_cloud.log" 2>&1 &
+./appflowy_cloud &
 
 wait_for_port "localhost" "8000" 60 "appflowy_cloud"
 
