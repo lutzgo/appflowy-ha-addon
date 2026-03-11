@@ -99,6 +99,7 @@ export MINIO_ROOT_PASSWORD="minioadmin"
 # ── 3. Create log directory ───────────────────────────────────────────────────
 bashio::log.info "Setting up log directory at ${LOG_DIR} …"
 mkdir -p "${LOG_DIR}"
+chmod 777 "${LOG_DIR}"
 
 # ── 4. Ensure PostgreSQL unix socket directory exists ─────────────────────────
 # /var/run is often a tmpfs in containers; recreate it each boot.
