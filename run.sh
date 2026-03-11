@@ -150,6 +150,12 @@ else
     bashio::log.info "Role 'supabase_auth_admin' created"
 fi
 
+# Set search_path=auth on the role so all GoTrue connections find auth.* tables
+# without needing an explicit schema qualifier.
+gosu postgres "${PSQL}" -c \
+    "ALTER ROLE supabase_auth_admin SET search_path TO auth, public;" \
+    >> "${LOG_DIR}/postgres.log" 2>&1
+
 # ── 7. Redis ──────────────────────────────────────────────────────────────────
 bashio::log.info "Starting Redis …"
 redis-server \
