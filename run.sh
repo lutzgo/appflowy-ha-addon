@@ -185,9 +185,12 @@ cd /appflowy_cloud
 wait_for_port "localhost" "8000" 60 "appflowy_cloud"
 
 # ── 11. Admin Frontend ────────────────────────────────────────────────────────
-# Override PORT=9999 (set for GoTrue in config.yml) – admin_frontend uses 3000.
+# Node.js app: node apps/super/server.js from /admin_frontend
+# PORT env var controls which port it listens on (default 3000).
 bashio::log.info "Starting Admin Frontend …"
-PORT=3000 ./admin_frontend >> "${LOG_DIR}/admin_frontend.log" 2>&1 &
+cd /admin_frontend
+PORT=3000 node apps/super/server.js >> "${LOG_DIR}/admin_frontend.log" 2>&1 &
+cd /appflowy_cloud
 
 # ── 12. AppFlowy Worker ───────────────────────────────────────────────────────
 bashio::log.info "Starting AppFlowy Worker …"

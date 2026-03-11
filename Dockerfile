@@ -102,6 +102,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         postgresql-15 \
         postgresql-client-15 \
         nginx \
+        nodejs \
         curl \
         ca-certificates \
         gosu \
@@ -139,18 +140,16 @@ RUN chmod +x /auth/auth /auth/start.sh
 RUN mkdir -p /appflowy_cloud
 
 COPY --from=source-appflowy /usr/local/bin/appflowy_cloud /appflowy_cloud/appflowy_cloud
-COPY --from=source-admin    /usr/local/bin/admin_frontend /appflowy_cloud/admin_frontend
 COPY --from=source-worker   /usr/local/bin/appflowy_worker /appflowy_cloud/appflowy_worker
 
 RUN chmod +x \
     /appflowy_cloud/appflowy_cloud \
-    /appflowy_cloud/admin_frontend \
     /appflowy_cloud/appflowy_worker
 
-# Admin frontend static assets (HTML/CSS/JS templates)
-COPY --from=build-source \
-    /appflowy_cloud_src/admin_frontend/assets \
-    /appflowy_cloud/assets
+# Admin frontend – Node.js app (not a Rust binary)
+# Image runs: node apps/super/server.js from WORKDIR /app
+RUN mkdir -p /admin_frontend
+COPY --from=source-admin /app /admin_frontend
 
 # ── PostgreSQL runtime socket directory ───────────────────────────────────────
 # /var/run/postgresql is the Debian default unix socket dir for pg.
