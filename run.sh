@@ -217,6 +217,13 @@ wait_for_port "localhost" "8000" 60 "appflowy_cloud"
 # Node.js app: node apps/super/server.js from /admin_frontend
 # PORT env var controls which port it listens on (default 3000).
 bashio::log.info "Starting Admin Frontend …"
+{
+  echo "=== admin_frontend dir listing ==="
+  ls -la /admin_frontend/ 2>&1 || echo "ERROR: /admin_frontend missing"
+  echo "=== node version ==="
+  node --version 2>&1
+  echo "=== starting server ==="
+} >> "${LOG_DIR}/admin_frontend.log" 2>&1
 cd /admin_frontend
 PORT=3000 node apps/super/server.js >> "${LOG_DIR}/admin_frontend.log" 2>&1 &
 cd /appflowy_cloud
