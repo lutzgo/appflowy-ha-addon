@@ -217,15 +217,17 @@ wait_for_port "localhost" "8000" 60 "appflowy_cloud"
 # Node.js app: node apps/super/server.js from /admin_frontend
 # PORT env var controls which port it listens on (default 3000).
 bashio::log.info "Starting Admin Frontend …"
-{
-  echo "=== admin_frontend dir listing ==="
-  ls -la /admin_frontend/ 2>&1 || echo "ERROR: /admin_frontend missing"
-  echo "=== node version ==="
-  node --version 2>&1
-  echo "=== starting server ==="
-} >> "${LOG_DIR}/admin_frontend.log" 2>&1
+bashio::log.info "admin_frontend dir: $(ls /admin_frontend/ 2>&1 | head -3 || echo MISSING)"
+bashio::log.info "node version: $(node --version 2>&1)"
 cd /admin_frontend
-PORT=3000 node apps/super/server.js >> "${LOG_DIR}/admin_frontend.log" 2>&1 &
+PORT=3000 node apps/super/server.js &
+ADMIN_PID=$!
+sleep 2
+if kill -0 "$ADMIN_PID" 2>/dev/null; then
+    bashio::log.info "Admin Frontend running (pid $ADMIN_PID)"
+else
+    bashio::log.error "Admin Frontend crashed immediately"
+fi
 cd /appflowy_cloud
 
 # ── 13. AppFlowy Worker ───────────────────────────────────────────────────────
