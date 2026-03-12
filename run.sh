@@ -218,9 +218,9 @@ wait_for_port "localhost" "8000" 60 "appflowy_cloud"
 # PORT env var controls which port it listens on (default 3000).
 bashio::log.info "Starting Admin Frontend …"
 cd /admin_frontend
-PORT=3000 node apps/super/server.js &
+PORT=3000 HOSTNAME=0.0.0.0 node apps/super/server.js &
 cd /appflowy_cloud
-wait_for_port localhost 3000 30 admin_frontend
+wait_for_port 127.0.0.1 3000 30 admin_frontend
 
 # ── 13. AppFlowy Worker ───────────────────────────────────────────────────────
 # appflowy_worker is not a separate binary in AppFlowy-Cloud main branch; skipping.
